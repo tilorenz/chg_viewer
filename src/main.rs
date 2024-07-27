@@ -8,6 +8,7 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use clap::Parser;
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum Kind {
@@ -144,8 +145,22 @@ fn format_enti(enti: &Entity) -> String {
     )
 }
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct CliArgs {
+    file_name: String,
+}
+
 fn main() {
-    let buf = fs::read_to_string("foo.json").unwrap();
+    let cli_args = CliArgs::parse();
+
+    let buf = match fs::read_to_string(&cli_args.file_name) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => panic!("File not found."),
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => panic!("Permission Denied"),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidData => panic!("File appears to be invalid UTF-8"),
+        Err(_) => panic!("Couldn't read file {}", &cli_args.file_name),
+    };
     let chg_graph: ChgGraph = serde_json::from_str(buf.as_str()).unwrap();
     let g = &chg_graph.graph;
 
