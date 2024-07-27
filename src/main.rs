@@ -1,3 +1,4 @@
+use clap::Parser;
 use colored::Colorize;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
@@ -8,7 +9,9 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use clap::Parser;
+extern crate cpp_demangle;
+use cpp_demangle::Symbol as DemanglerSymbol;
+use std::string::ToString;
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum Kind {
@@ -131,10 +134,17 @@ fn format_enti(enti: &Entity) -> String {
         enti.symbol.name.bright_blue()
     };
 
+    let clean_name = if let Ok(name) = DemanglerSymbol::new(&enti.symbol.name) {
+        format!("Demangled: {}\n", name.to_string().magenta())
+    } else {
+        String::from("")
+    };
+
     format!(
-        "{} {}\nPath: {}\nGlobal hash: {}, Local hash: {}\n\n",
+        "{} {}\n{}Path: {}\nGlobal hash: {}, Local hash: {}\n",
         sym_kind,
         sym_name,
+        clean_name,
         decl_path.trim_matches('"'),
         serde_json::to_string(&enti.global_hash)
             .unwrap()
@@ -158,7 +168,9 @@ fn main() {
         Ok(b) => b,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => panic!("File not found."),
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => panic!("Permission Denied"),
-        Err(e) if e.kind() == std::io::ErrorKind::InvalidData => panic!("File appears to be invalid UTF-8"),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+            panic!("File appears to be invalid UTF-8")
+        }
         Err(_) => panic!("Couldn't read file {}", &cli_args.file_name),
     };
     let chg_graph: ChgGraph = serde_json::from_str(buf.as_str()).unwrap();
@@ -183,6 +195,9 @@ fn main() {
             .expect("Schreib deutlich, die Sauklaue kann ja keiner lesen!");
 
         let name = name.trim();
+        if name.is_empty() {
+            continue;
+        }
 
         match names_to_indices.get(name) {
             Some(indices) => {
@@ -197,7 +212,11 @@ fn main() {
                     );
 
                     for nbr_idx in g.neighbors_directed(*idx, Direction::Incoming) {
-                        println!("{}:\n{}", "Incoming".green().bold(), format_enti(&g[nbr_idx]));
+                        println!(
+                            "{}:\n{}",
+                            "Incoming".green().bold(),
+                            format_enti(&g[nbr_idx])
+                        );
                     }
 
                     for nbr_idx in g.neighbors_directed(*idx, Direction::Outgoing) {
@@ -210,7 +229,13 @@ fn main() {
                 }
             }
             None => {
-                println!("Couldn't find symbol with name\n{name}");
+                let clean_name = if let Ok(clean_name) = DemanglerSymbol::new(&name) {
+                    format!("\nDemangled: {}", clean_name.to_string().magenta())
+                } else {
+                    String::from("")
+                };
+
+                println!("Couldn't find symbol with name\n{name}{clean_name}");
             }
         }
     }
