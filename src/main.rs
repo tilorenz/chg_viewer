@@ -1,3 +1,4 @@
+use colored::Colorize;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
 use petgraph::Direction;
@@ -5,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -108,6 +109,41 @@ pub struct ChgGraph {
     pub root: Option<NodeIndex>,
 }
 
+fn format_enti(enti: &Entity) -> String {
+    let decl_path = if let Some(dp) = &enti.symbol.declaration_path {
+        dp.to_str().unwrap().to_owned()
+    } else {
+        "none".to_owned()
+    };
+
+    let sym_kind = serde_json::to_string(&enti.symbol.kind).unwrap();
+    let sym_kind = sym_kind.trim_matches('"');
+    let sym_kind = if enti.symbol.kind == Kind::Synthetic {
+        sym_kind.normal()
+    } else {
+        sym_kind.yellow()
+    };
+
+    let sym_name = if enti.symbol.kind == Kind::Synthetic {
+        enti.symbol.name.normal()
+    } else {
+        enti.symbol.name.bright_blue()
+    };
+
+    format!(
+        "{} {}\nPath: {}\nGlobal hash: {}, Local hash: {}\n\n",
+        sym_kind,
+        sym_name,
+        decl_path.trim_matches('"'),
+        serde_json::to_string(&enti.global_hash)
+            .unwrap()
+            .trim_matches('"'),
+        serde_json::to_string(&enti.local_hash)
+            .unwrap()
+            .trim_matches('"'),
+    )
+}
+
 fn main() {
     let buf = fs::read_to_string("foo.json").unwrap();
     let chg_graph: ChgGraph = serde_json::from_str(buf.as_str()).unwrap();
@@ -122,6 +158,10 @@ fn main() {
     }
 
     loop {
+        // this prompt may not be aesthetically pleasing, but when I scroll through the terminal, I
+        // want it to stand out as much as possible
+        print!("{}", "> ".on_bright_yellow().black().bold());
+        _ = io::stdout().flush();
         let mut name = String::new();
         io::stdin()
             .read_line(&mut name)
@@ -134,19 +174,24 @@ fn main() {
                 println!("Found {} entries for symbol {name}", indices.len());
                 for (i, idx) in indices.iter().enumerate() {
                     let enti = &g[*idx];
-                    println!("Symbol ({}/{}): {:#?}\n", i+1, indices.len(), enti.symbol);
+                    println!(
+                        "Symbol ({}/{}):\n{}",
+                        i + 1,
+                        indices.len(),
+                        format_enti(enti)
+                    );
 
                     for nbr_idx in g.neighbors_directed(*idx, Direction::Incoming) {
-                        println!("Incoming: {:#?}", g[nbr_idx].symbol);
+                        println!("{}:\n{}", "Incoming".green().bold(), format_enti(&g[nbr_idx]));
                     }
-
-                    println!("");
 
                     for nbr_idx in g.neighbors_directed(*idx, Direction::Outgoing) {
-                        println!("Outgoing: {:#?}", g[nbr_idx].symbol);
+                        println!("{}:\n{}", "Outgoing".red().bold(), format_enti(&g[nbr_idx]));
                     }
 
-                    println!("====================================================================");
+                    println!(
+                        "===================================================================="
+                    );
                 }
             }
             None => {
