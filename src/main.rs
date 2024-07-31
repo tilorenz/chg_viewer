@@ -10,8 +10,8 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use iced::widget::{column, container, text, text_input, Column};
-use iced::{Element as IcedElement, Theme};
+use iced::widget::{column, container, text, text_input, Column, Container};
+use iced::{border, Element as IcedElement, Theme};
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum Kind {
@@ -210,7 +210,8 @@ impl App {
                 .on_input(Message::SearchSymbol)
                 .on_paste(Message::SearchSymbol),
             //text(def_file)
-        );
+        )
+        .spacing(2.0);
 
         for idx in self.matching.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
@@ -224,6 +225,20 @@ impl App {
 
         col.into()
     }
+
+    fn theme(&self) -> Theme {
+        Theme::Dracula
+    }
+}
+
+pub fn well_rounded_container(theme: &Theme) -> container::Style {
+    let palette = theme.extended_palette();
+
+    container::Style {
+        background: Some(palette.background.weak.color.into()),
+        border: border::rounded(10),
+        ..container::Style::default()
+    }
 }
 
 fn entity_view(enti: &Entity) -> IcedElement<Message> {
@@ -234,15 +249,24 @@ fn entity_view(enti: &Entity) -> IcedElement<Message> {
         enti.symbol.declaration_path,
         serde_json::to_string(&enti.global_hash).unwrap(),
         serde_json::to_string(&enti.local_hash).unwrap(),
-        
     );
-    let col: Column<Message> = column!(text(symbol_kind_name),);
-    iced::widget::container::Container::new(col).into()
+    //let col: Column<Message> = column!(text(symbol_kind_name),);
+    //iced::widget::container::Container::new(col).into()
     //col.into()
+
+    let txt = text(symbol_kind_name);
+
+    Container::new(
+        txt, //column!(text(symbol_kind_name),)
+    )
+    .style(well_rounded_container)
+    .into()
 }
 
 fn main() -> iced::Result {
-    iced::run("CHG Viewer", App::update, App::view)
+    iced::application("CHG Viewer", App::update, App::view)
+        .theme(App::theme)
+        .run()
 
     //loop {
     //let mut name = String::new();

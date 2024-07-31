@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies.iced]
 git = "https://github.com/iced-rs/iced.git"
-rev = "cdb18e610a72b4a025d7e1890140393adee5b087"
+rev = "fd593f8fb0c8476463f9c04ae2bcc96784b8c530"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
