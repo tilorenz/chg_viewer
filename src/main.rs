@@ -9,6 +9,7 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::process::exit;
 extern crate cpp_demangle;
 use cpp_demangle::Symbol as DemanglerSymbol;
 use std::string::ToString;
@@ -190,9 +191,13 @@ fn main() {
         print!("{}", "> ".on_bright_yellow().black().bold());
         _ = io::stdout().flush();
         let mut name = String::new();
-        io::stdin()
+        let bytes_read = io::stdin()
             .read_line(&mut name)
             .expect("Schreib deutlich, die Sauklaue kann ja keiner lesen!");
+
+        if bytes_read == 0 {
+            exit(0);
+        }
 
         let name = name.trim();
         if name.is_empty() {
