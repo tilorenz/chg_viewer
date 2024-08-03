@@ -1,3 +1,4 @@
+use clap::Parser;
 use iced::event::Status;
 use petgraph::data::Element;
 use petgraph::graph::NodeIndex;
@@ -10,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use iced::widget::{column, container, text, text_input, Column, Container};
+use iced::widget::{column, container, text, text_input, Column, Container, Scrollable};
 use iced::{border, Element as IcedElement, Theme};
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -133,8 +134,19 @@ enum Message {
 
 impl Default for App {
     fn default() -> Self {
-        let buf = fs::read_to_string("foo.json").unwrap();
-        //let chg_graph: ChgGraph = serde_json::from_str(buf.as_str()).unwrap();
+        let cli_args = CliArgs::parse();
+
+        let buf = match fs::read_to_string(&cli_args.file_name) {
+            Ok(b) => b,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => panic!("File not found."),
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                panic!("Permission Denied")
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+                panic!("File appears to be invalid UTF-8")
+            }
+            Err(_) => panic!("Couldn't read file {}", &cli_args.file_name),
+        };
 
         let mut app = Self {
             graph: serde_json::from_str(buf.as_str()).unwrap(),
@@ -223,7 +235,7 @@ impl App {
         //col = col.push(text(df));
         //}
 
-        col.into()
+        Scrollable::new(col).into()
     }
 
     fn theme(&self) -> Theme {
@@ -231,6 +243,7 @@ impl App {
     }
 }
 
+// like rounded_box, but more rounded
 pub fn well_rounded_container(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
 
@@ -241,20 +254,35 @@ pub fn well_rounded_container(theme: &Theme) -> container::Style {
     }
 }
 
-fn entity_view(enti: &Entity) -> IcedElement<Message> {
-    let symbol_kind_name = format!(
-        "{} {}\nPath: {:?}\nGlobal hash: {}, Local hash: {}\n\n",
-        serde_json::to_string(&enti.symbol.kind).unwrap(),
+fn format_enti(enti: &Entity) -> String {
+    let decl_path = if let Some(dp) = &enti.symbol.declaration_path {
+        dp.to_str().unwrap()
+    } else {
+        "none"
+    };
+
+    format!(
+        "{} {}\nPath: {}\nGlobal hash: {}\nLocal hash: {}\n\n",
+        serde_json::to_string(&enti.symbol.kind)
+            .unwrap()
+            .trim_matches('"'),
         enti.symbol.name,
-        enti.symbol.declaration_path,
-        serde_json::to_string(&enti.global_hash).unwrap(),
-        serde_json::to_string(&enti.local_hash).unwrap(),
-    );
+        decl_path.trim_matches('"'),
+        serde_json::to_string(&enti.global_hash)
+            .unwrap()
+            .trim_matches('"'),
+        serde_json::to_string(&enti.local_hash)
+            .unwrap()
+            .trim_matches('"'),
+    )
+}
+
+fn entity_view(enti: &Entity) -> IcedElement<Message> {
     //let col: Column<Message> = column!(text(symbol_kind_name),);
     //iced::widget::container::Container::new(col).into()
     //col.into()
 
-    let txt = text(symbol_kind_name);
+    let txt = text(format_enti(enti));
 
     Container::new(
         txt, //column!(text(symbol_kind_name),)
@@ -263,42 +291,14 @@ fn entity_view(enti: &Entity) -> IcedElement<Message> {
     .into()
 }
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct CliArgs {
+    file_name: String,
+}
+
 fn main() -> iced::Result {
     iced::application("CHG Viewer", App::update, App::view)
         .theme(App::theme)
         .run()
-
-    //loop {
-    //let mut name = String::new();
-    //io::stdin()
-    //.read_line(&mut name)
-    //.expect("Schreib deutlich, die Sauklaue kann ja keiner lesen!");
-
-    //let name = name.trim();
-
-    //match names_to_indices.get(name) {
-    //Some(indices) => {
-    //println!("Found {} entries for symbol {name}", indices.len());
-    //for (i, idx) in indices.iter().enumerate() {
-    //let enti = &g[*idx];
-    //println!("Symbol ({}/{}): {:#?}\n", i+1, indices.len(), enti.symbol);
-
-    //for nbr_idx in g.neighbors_directed(*idx, Direction::Incoming) {
-    //println!("Incoming: {:#?}", g[nbr_idx].symbol);
-    //}
-
-    //println!("");
-
-    //for nbr_idx in g.neighbors_directed(*idx, Direction::Outgoing) {
-    //println!("Outgoing: {:#?}", g[nbr_idx].symbol);
-    //}
-
-    //println!("====================================================================");
-    //}
-    //}
-    //None => {
-    //println!("Couldn't find symbol with name\n{name}");
-    //}
-    //}
-    //}
 }

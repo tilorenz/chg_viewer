@@ -13,4 +13,5 @@ rev = "fd593f8fb0c8476463f9c04ae2bcc96784b8c530"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 petgraph = { version = "0.5", features = ["serde-1"] }
+clap = { version = "4.5.11", features = ["derive"] }
 
