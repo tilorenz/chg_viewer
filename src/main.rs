@@ -1,4 +1,5 @@
 use clap::Parser;
+use cpp_demangle::Symbol as DemanglerSymbol;
 use iced::event::Status;
 use petgraph::data::Element;
 use petgraph::graph::NodeIndex;
@@ -10,10 +11,11 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
-use cpp_demangle::Symbol as DemanglerSymbol;
 use std::string::ToString;
 
-use iced::widget::{column, container, text, text_input, Column, Container, Scrollable};
+use iced::widget::{
+    column, container, row, text, text_input, Column, Container, MouseArea, Rule, Scrollable,
+};
 use iced::{border, Element as IcedElement, Theme};
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -187,6 +189,7 @@ impl App {
             }
             Message::SelectionChanged(idx) => {
                 if let Some(idx) = idx {
+                    self.matching = vec![idx];
                     self.incoming = self
                         .graph
                         .graph
@@ -207,37 +210,41 @@ impl App {
     }
 
     fn view(&self) -> IcedElement<Message> {
-        let mut def_files = vec![String::from("none...")];
+        let mut enti_col: iced::widget::Column<Message> = column!().spacing(2.0);
+        let mut incoming_col: iced::widget::Column<Message> = column!().spacing(2.0);
+        let mut outgoing_col: iced::widget::Column<Message> = column!().spacing(2.0);
+
         for idx in self.matching.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                def_files.push(serde_json::to_string(enti).unwrap());
+                enti_col = enti_col.push(entity_view(&enti, *idx));
             }
         }
-        //if let Some(idx) = self.matching.get(0) {
-        //if let Some(enti) = self.graph.graph.node_weight(*idx) {
-        //let st = String::new();
-        //def_file = serde_json::to_string(enti).unwrap();
-        //}
-        //}
-        let mut col: iced::widget::Column<Message> = column!(
+        for idx in self.incoming.iter() {
+            if let Some(enti) = self.graph.graph.node_weight(*idx) {
+                incoming_col = incoming_col.push(entity_view(&enti, *idx));
+            }
+        }
+        for idx in self.outgoing.iter() {
+            if let Some(enti) = self.graph.graph.node_weight(*idx) {
+                outgoing_col = outgoing_col.push(entity_view(&enti, *idx));
+            }
+        }
+
+        let main_row = row!(
+            Scrollable::new(incoming_col),
+            Rule::vertical(5),
+            Scrollable::new(enti_col),
+            Rule::vertical(5),
+            Scrollable::new(outgoing_col),
+        );
+
+        column!(
             text_input("Search Symbol...", &self.searched_name)
                 .on_input(Message::SearchSymbol)
                 .on_paste(Message::SearchSymbol),
-            //text(def_file)
+            main_row
         )
-        .spacing(2.0);
-
-        for idx in self.matching.iter() {
-            if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                col = col.push(entity_view(&enti));
-            }
-        }
-
-        //for df in def_files {
-        //col = col.push(text(df));
-        //}
-
-        Scrollable::new(col).into()
+        .into()
     }
 
     fn theme(&self) -> Theme {
@@ -269,7 +276,6 @@ fn format_enti(enti: &Entity) -> String {
         String::from("")
     };
 
-
     format!(
         "{} {}\n{}Path: {}\nGlobal hash: {}\nLocal hash: {}\n\n",
         serde_json::to_string(&enti.symbol.kind)
@@ -287,17 +293,16 @@ fn format_enti(enti: &Entity) -> String {
     )
 }
 
-fn entity_view(enti: &Entity) -> IcedElement<Message> {
-    //let col: Column<Message> = column!(text(symbol_kind_name),);
-    //iced::widget::container::Container::new(col).into()
-    //col.into()
-
+fn entity_view(enti: &Entity, idx: NodeIndex) -> IcedElement<Message> {
     let txt = text(format_enti(enti));
 
-    Container::new(
-        txt, //column!(text(symbol_kind_name),)
+    MouseArea::new(
+        Container::new(
+            txt, //column!(text(symbol_kind_name),)
+        )
+        .style(well_rounded_container),
     )
-    .style(well_rounded_container)
+    .on_press(Message::SelectionChanged(Some(idx)))
     .into()
 }
 
