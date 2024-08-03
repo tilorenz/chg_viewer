@@ -10,6 +10,8 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
+use cpp_demangle::Symbol as DemanglerSymbol;
+use std::string::ToString;
 
 use iced::widget::{column, container, text, text_input, Column, Container, Scrollable};
 use iced::{border, Element as IcedElement, Theme};
@@ -261,12 +263,20 @@ fn format_enti(enti: &Entity) -> String {
         "none"
     };
 
+    let clean_name = if let Ok(name) = DemanglerSymbol::new(&enti.symbol.name) {
+        format!("Demangled: {}\n", name.to_string())
+    } else {
+        String::from("")
+    };
+
+
     format!(
-        "{} {}\nPath: {}\nGlobal hash: {}\nLocal hash: {}\n\n",
+        "{} {}\n{}Path: {}\nGlobal hash: {}\nLocal hash: {}\n\n",
         serde_json::to_string(&enti.symbol.kind)
             .unwrap()
             .trim_matches('"'),
         enti.symbol.name,
+        clean_name,
         decl_path.trim_matches('"'),
         serde_json::to_string(&enti.global_hash)
             .unwrap()
