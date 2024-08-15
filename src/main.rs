@@ -1,6 +1,6 @@
 use clap::Parser;
 use cpp_demangle::Symbol as DemanglerSymbol;
-use iced::event::Status;
+use iced::event::{self, Status};
 use petgraph::data::Element;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
@@ -16,7 +16,7 @@ use std::string::ToString;
 use iced::widget::{
     column, container, row, text, text_input, Column, Container, MouseArea, Rule, Scrollable,
 };
-use iced::{border, Element as IcedElement, Theme};
+use iced::{border, window, Element as IcedElement, Event, Subscription, Theme};
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum Kind {
@@ -120,13 +120,19 @@ pub struct ChgGraph {
 
 #[derive(Debug)]
 struct App {
+    // === Business data ===
     graph: ChgGraph,
     names_to_indices: HashMap<String, Vec<NodeIndex>>,
+
+    // === Gui state ===
     searched_name: String,
     selected_index: Option<NodeIndex>,
     incoming: Vec<NodeIndex>,
     matching: Vec<NodeIndex>,
     outgoing: Vec<NodeIndex>,
+
+    // === Gui layout ===
+    window_width: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -134,6 +140,7 @@ enum Message {
     GraphLoaded, // unused for now, we just assume it's there and won't change
     SearchSymbol(String),
     SelectionChanged(Option<NodeIndex>),
+    WindowResized(iced::Size),
 }
 
 impl Default for App {
@@ -160,6 +167,7 @@ impl Default for App {
             incoming: Vec::new(),
             matching: Vec::new(),
             outgoing: Vec::new(),
+            window_width: 420.0,
         };
 
         //let mut names_to_indices: HashMap<&str, Vec<NodeIndex>> = HashMap::new();
@@ -205,6 +213,9 @@ impl App {
                     self.outgoing = Vec::new();
                 }
             }
+            Message::WindowResized(size) => {
+                self.window_width = size.width;
+            }
             _ => (),
         }
     }
@@ -214,27 +225,29 @@ impl App {
         let mut incoming_col: iced::widget::Column<Message> = column!().spacing(2.0);
         let mut outgoing_col: iced::widget::Column<Message> = column!().spacing(2.0);
 
+        let column_width = self.window_width / 3.0 - 18.0;
+
         for idx in self.matching.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                enti_col = enti_col.push(entity_view(&enti, *idx));
+                enti_col = enti_col.push(entity_view(&enti, *idx, column_width));
             }
         }
         for idx in self.incoming.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                incoming_col = incoming_col.push(entity_view(&enti, *idx));
+                incoming_col = incoming_col.push(entity_view(&enti, *idx, column_width));
             }
         }
         for idx in self.outgoing.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                outgoing_col = outgoing_col.push(entity_view(&enti, *idx));
+                outgoing_col = outgoing_col.push(entity_view(&enti, *idx, column_width));
             }
         }
 
         let main_row = row!(
             Scrollable::new(incoming_col),
-            Rule::vertical(5),
+            Rule::vertical(8),
             Scrollable::new(enti_col),
-            Rule::vertical(5),
+            Rule::vertical(8),
             Scrollable::new(outgoing_col),
         );
 
@@ -249,6 +262,13 @@ impl App {
 
     fn theme(&self) -> Theme {
         Theme::Dracula
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        event::listen_with(|event, _status, _id| match event {
+            Event::Window(window::Event::Resized(size)) => Some(Message::WindowResized(size)),
+            _ => None,
+        })
     }
 }
 
@@ -293,13 +313,14 @@ fn format_enti(enti: &Entity) -> String {
     )
 }
 
-fn entity_view(enti: &Entity, idx: NodeIndex) -> IcedElement<Message> {
+fn entity_view(enti: &Entity, idx: NodeIndex, width: f32) -> IcedElement<Message> {
     let txt = text(format_enti(enti));
 
     MouseArea::new(
         Container::new(
             txt, //column!(text(symbol_kind_name),)
         )
+        .width(width)
         .style(well_rounded_container),
     )
     .on_press(Message::SelectionChanged(Some(idx)))
@@ -315,5 +336,6 @@ struct CliArgs {
 fn main() -> iced::Result {
     iced::application("CHG Viewer", App::update, App::view)
         .theme(App::theme)
+        .subscription(App::subscription)
         .run()
 }
