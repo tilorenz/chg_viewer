@@ -221,11 +221,14 @@ impl App {
     }
 
     fn view(&self) -> IcedElement<Message> {
-        let mut enti_col: iced::widget::Column<Message> = column!().spacing(2.0);
-        let mut incoming_col: iced::widget::Column<Message> = column!().spacing(2.0);
-        let mut outgoing_col: iced::widget::Column<Message> = column!().spacing(2.0);
-
         let column_width = self.window_width / 3.0 - 18.0;
+
+        let mut enti_col: iced::widget::Column<Message> =
+            column!().spacing(2.0).width(column_width);
+        let mut incoming_col: iced::widget::Column<Message> =
+            column!().spacing(2.0).width(column_width);
+        let mut outgoing_col: iced::widget::Column<Message> =
+            column!().spacing(2.0).width(column_width);
 
         for idx in self.matching.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
@@ -321,6 +324,7 @@ fn entity_view(enti: &Entity, idx: NodeIndex, width: f32) -> IcedElement<Message
             txt, //column!(text(symbol_kind_name),)
         )
         .width(width)
+        .padding(3.0)
         .style(well_rounded_container),
     )
     .on_press(Message::SelectionChanged(Some(idx)))
