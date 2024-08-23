@@ -197,6 +197,7 @@ impl App {
             }
             Message::SelectionChanged(idx) => {
                 if let Some(idx) = idx {
+                    self.selected_index = Some(idx);
                     self.matching = vec![idx];
                     self.incoming = self
                         .graph
@@ -232,17 +233,17 @@ impl App {
 
         for idx in self.matching.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                enti_col = enti_col.push(entity_view(&enti, *idx, column_width));
+                enti_col = enti_col.push(entity_view(&enti, *idx, column_width, self.selected_index));
             }
         }
         for idx in self.incoming.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                incoming_col = incoming_col.push(entity_view(&enti, *idx, column_width));
+                incoming_col = incoming_col.push(entity_view(&enti, *idx, column_width, self.selected_index));
             }
         }
         for idx in self.outgoing.iter() {
             if let Some(enti) = self.graph.graph.node_weight(*idx) {
-                outgoing_col = outgoing_col.push(entity_view(&enti, *idx, column_width));
+                outgoing_col = outgoing_col.push(entity_view(&enti, *idx, column_width, self.selected_index));
             }
         }
 
@@ -286,6 +287,17 @@ pub fn well_rounded_container(theme: &Theme) -> container::Style {
     }
 }
 
+// like rounded_box, but more rounded
+pub fn selected_well_rounded_container(theme: &Theme) -> container::Style {
+    let palette = theme.extended_palette();
+
+    container::Style {
+        background: Some(palette.background.strong.color.into()),
+        border: border::rounded(10),
+        ..container::Style::default()
+    }
+}
+
 fn format_enti(enti: &Entity) -> String {
     let decl_path = if let Some(dp) = &enti.symbol.declaration_path {
         dp.to_str().unwrap()
@@ -300,24 +312,26 @@ fn format_enti(enti: &Entity) -> String {
     };
 
     format!(
-        "{} {}\n{}Path: {}\nGlobal hash: {}\nLocal hash: {}\n\n",
+        "{} {}\n{}Path: {}\nGlobal hash: {:032x}\nLocal hash: {:032x}\n\n",
         serde_json::to_string(&enti.symbol.kind)
             .unwrap()
             .trim_matches('"'),
         enti.symbol.name,
         clean_name,
         decl_path.trim_matches('"'),
-        serde_json::to_string(&enti.global_hash)
-            .unwrap()
-            .trim_matches('"'),
-        serde_json::to_string(&enti.local_hash)
-            .unwrap()
-            .trim_matches('"'),
+        &enti.global_hash,
+        &enti.local_hash,
     )
 }
 
-fn entity_view(enti: &Entity, idx: NodeIndex, width: f32) -> IcedElement<Message> {
+fn entity_view(enti: &Entity, idx: NodeIndex, width: f32, selected_idx: Option<NodeIndex>) -> IcedElement<Message> {
     let txt = text(format_enti(enti));
+
+    let mut selected = false;
+    if let Some(si) = selected_idx {
+        selected = idx == si;
+    }
+    let style = if selected { selected_well_rounded_container } else { well_rounded_container };
 
     MouseArea::new(
         Container::new(
@@ -325,7 +339,7 @@ fn entity_view(enti: &Entity, idx: NodeIndex, width: f32) -> IcedElement<Message
         )
         .width(width)
         .padding(3.0)
-        .style(well_rounded_container),
+        .style(style),
     )
     .on_press(Message::SelectionChanged(Some(idx)))
     .into()
