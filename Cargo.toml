@@ -5,11 +5,8 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.iced]
-git = "https://github.com/iced-rs/iced.git"
-rev = "fd593f8fb0c8476463f9c04ae2bcc96784b8c530"
-
 [dependencies]
+iced = { version = "0.13" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 petgraph = { version = "0.5", features = ["serde-1"] }
